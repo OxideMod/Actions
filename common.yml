@@ -1,0 +1,131 @@
+name: Common Actions
+description: Commonly used actions output for the Oxide project
+
+inputs:
+  myget-source:
+    description: "MyGet source to publish to, defaults to https://www.myget.org/f/oxide/api/v2/package"
+    required: false
+    default: https://www.myget.org/f/oxide/api/v2/package
+
+  myget-api-key:
+    description: "API key for MyGet package deployment, defaults to MYGET_API_KEY organization secret"
+    required: false
+    default: ${{ secrets.MYGET_API_KEY }}
+
+  nuget-source:
+    description: "NuGet source to publish to, defaults to https://{{ github.repository_owner }}/index.json"
+    required: false
+    default: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+
+  nuget-api-key:
+    description: "API key for NuGet package deployment, defaults to NUGET_API_KEY organization secret"
+    required: false
+    default: ${{ secrets.NUGET_API_KEY }}
+
+  configuration:
+    description: "Build configuration to use, defaults to Release"
+    required: false
+    default: Release
+
+  project-path:
+    description: "Path to the project file"
+    required: false
+
+outputs:
+  project-version:
+    description: "Get project version"
+    value: ${{ steps.project_version.outputs.version }}
+
+  build-version:
+    description: "Get build version"
+    value: ${{ steps.build_version.outputs.version }}
+
+  package-version:
+    description: "Get package version"
+    value: ${{ steps.package_version.outputs.version }}
+
+  meta-version:
+    description: "Get meta version"
+    value: ${{ steps.meta_version.outputs.version }}
+
+  repo-name:
+    description: "Get repository name"
+    value: ${{ steps.repo_name.outputs.name }}
+
+  git-short-sha:
+    description: "Get git commit short SHA"
+    value: ${{ steps.git_short_sha.outputs.sha }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: project_version
+      run: |
+        $xml = [Xml](Get-Content (Get-ChildItem Common.props, *.csproj -Recurse | Select-Object -First 1))
+        $version = [Version]$xml.Project.PropertyGroup.Version
+        $version = $version.Substring(0, $version.lastIndexOf('.'))
+        echo "Project version: $version"
+        echo "::set-output name=version::$version"
+      shell: pwsh
+
+    - id: build_version
+      run: |
+        $version = '${{ steps.project_version.outputs.version }}.${{ github.run_number }} # ex. 1.0.1234
+        echo "Build version: $version"
+        echo "::set-output name=version::$version"
+      shell: pwsh
+
+    - id: package_version
+      run: |
+        $version = "${{ steps.buildversion.outputs.version }}-${{ github.ref_name }}" # ex. 1.0.1234-develop
+        echo "Package version: $version"
+        echo "::set-output name=version::$version"
+      shell: pwsh
+
+    - id: meta_version
+      run: |
+        $version = "${{ steps.package_version.outputs.version }}+git.$CI_COMMIT_SHORT_SHA" # ex. 1.0.1234-develop+git.91ab23c4
+        echo "Meta version: $version"
+        echo "::set-output name=version::$version"
+      shell: pwsh
+
+    - id: git_short_sha
+      run: |
+        $sha = "${{ github.sha }}".Substring(0,8)
+        echo "Git commit short SHA: $sha"
+        echo "::set-output name=sha::$sha"
+      shell: pwsh
+
+    - id: repo_name
+      run: |
+        $name = $(Split-Path ${{ github.repository }} -Leaf)
+        echo "Repository name is $name
+        echo "::set-output name=name::$name"
+      shell: pwsh
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ inputs.solution-path }}
+      shell: bash
+
+    - name: Build solution
+      run: dotnet build ${{ inputs.solution-path }} --no-restore --configuration ${{ inputs.configuration }}
+      shell: bash
+
+    - name: Run tests
+      run: dotnet test ${{ inputs.solution-path }} --no-build --configuration ${{ inputs.configuration }}
+      shell: bash
+
+    - name: Package for NuGet
+      run: dotnet pack ${{ inputs.solution-path }} --no-build --configuration ${{ inputs.configuration }} /p:Version=${{ inputs.version }} -o packages
+      shell: bash
+
+    - name: Push MyGet package
+      run: |
+        dotnet nuget push packages/*.nupkg --source ${{ inputs.myget-source }} --skip-duplicate --api-key ${{ inputs.myget-api-key }}
+      shell: bash
+
+    - name: Push NuGet package
+      run: |
+        dotnet nuget push packages/*.nupkg --source ${{ inputs.nuget-source }} --skip-duplicate --api-key ${{ inputs.nuget-api-key }}
+      shell: bash
+   
