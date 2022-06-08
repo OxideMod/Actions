@@ -2,57 +2,59 @@ name: Common Actions
 description: Commonly used actions output for the Oxide project
 
 inputs:
-  myget-source:
+  myget_source:
     description: "MyGet source to publish to, defaults to https://www.myget.org/f/oxide/api/v2/package"
     required: false
     default: https://www.myget.org/f/oxide/api/v2/package
 
-  myget-api-key:
-    description: "API key for MyGet package deployment, defaults to MYGET_API_KEY organization secret"
+  myget_api_key:
+    description: "API key for MyGet package deployment"
     required: false
-    default: ${{ secrets.MYGET_API_KEY }}
 
-  nuget-source:
+  nuget_source:
     description: "NuGet source to publish to, defaults to https://{{ github.repository_owner }}/index.json"
     required: false
     default: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
 
-  nuget-api-key:
-    description: "API key for NuGet package deployment, defaults to NUGET_API_KEY organization secret"
+  nuget_api_key:
+    description: "API key for NuGet package deployment"
     required: false
-    default: ${{ secrets.NUGET_API_KEY }}
 
   configuration:
     description: "Build configuration to use, defaults to Release"
     required: false
     default: Release
 
-  project-path:
+  project_path:
     description: "Path to the project file"
     required: false
 
+  solution_path:
+    description: "Path to the solution file"
+    required: false
+
 outputs:
-  project-version:
+  project_version:
     description: "Get project version"
     value: ${{ steps.project_version.outputs.version }}
 
-  build-version:
+  build_version:
     description: "Get build version"
     value: ${{ steps.build_version.outputs.version }}
 
-  package-version:
+  package_version:
     description: "Get package version"
     value: ${{ steps.package_version.outputs.version }}
 
-  meta-version:
+  meta_version:
     description: "Get meta version"
     value: ${{ steps.meta_version.outputs.version }}
 
-  repo-name:
+  repo_name:
     description: "Get repository name"
     value: ${{ steps.repo_name.outputs.name }}
 
-  git-short-sha:
+  git_short_sha:
     description: "Get git commit short SHA"
     value: ${{ steps.git_short_sha.outputs.sha }}
 
@@ -77,14 +79,14 @@ runs:
 
     - id: package_version
       run: |
-        $version = "${{ steps.buildversion.outputs.version }}-${{ github.ref_name }}" # ex. 1.0.1234-develop
+        $version = "${{ steps.build_version.outputs.version }}-${{ github.ref_name }}" # ex. 1.0.1234-develop
         echo "Package version: $version"
         echo "::set-output name=version::$version"
       shell: pwsh
 
     - id: meta_version
       run: |
-        $version = "${{ steps.package_version.outputs.version }}+git.$CI_COMMIT_SHORT_SHA" # ex. 1.0.1234-develop+git.91ab23c4
+        $version = "${{ steps.package_version.outputs.version }}+git.${{ steps.git_short_sha.outputs.sha }}" # ex. 1.0.1234-develop+git.91ab23c4
         echo "Meta version: $version"
         echo "::set-output name=version::$version"
       shell: pwsh
@@ -104,28 +106,27 @@ runs:
       shell: pwsh
 
     - name: Restore dependencies
-      run: dotnet restore ${{ inputs.solution-path }}
+      run: dotnet restore ${{ inputs.solution_path }}
       shell: bash
 
     - name: Build solution
-      run: dotnet build ${{ inputs.solution-path }} --no-restore --configuration ${{ inputs.configuration }}
+      run: dotnet build ${{ inputs.solution_path }} --no-restore --configuration ${{ inputs.configuration }}
       shell: bash
 
     - name: Run tests
-      run: dotnet test ${{ inputs.solution-path }} --no-build --configuration ${{ inputs.configuration }}
+      run: dotnet test ${{ inputs.project_path }} --no-build --configuration ${{ inputs.configuration }}
       shell: bash
 
     - name: Package for NuGet
-      run: dotnet pack ${{ inputs.solution-path }} --no-build --configuration ${{ inputs.configuration }} /p:Version=${{ inputs.version }} -o packages
+      run: dotnet pack ${{ inputs.solution_path }} --no-build --configuration ${{ inputs.configuration }} /p:Version=${{ steps.package_version.outputs.version }} -o packages
       shell: bash
 
     - name: Push MyGet package
       run: |
-        dotnet nuget push packages/*.nupkg --source ${{ inputs.myget-source }} --skip-duplicate --api-key ${{ inputs.myget-api-key }}
+        dotnet nuget push packages/*.nupkg --source ${{ inputs.myget_source }} --skip-duplicate --api-key ${{ inputs.myget_api_key }}
       shell: bash
 
     - name: Push NuGet package
       run: |
-        dotnet nuget push packages/*.nupkg --source ${{ inputs.nuget-source }} --skip-duplicate --api-key ${{ inputs.nuget-api-key }}
+        dotnet nuget push packages/*.nupkg --source ${{ inputs.nuget_source }} --skip-duplicate --api-key ${{ inputs.nuget_api_key }}
       shell: bash
-   
