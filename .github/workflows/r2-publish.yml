@@ -2,18 +2,16 @@ name: Publish to Cloudflare R2
 on:
   workflow_call:
     inputs:
-      key:
-        required: true
-        type: string
-      secret:
-        required: true
-        type: string
-      endpoint:
-        required: true
-        type: string
       generate-filehash:
         required: false
         type: boolean
+    secrets:
+      CLOUDFLARE_R2_KEY:
+        required: true
+      CLOUDFLARE_R2_SECRET:
+        required: true
+      CLOUDFLARE_R2_ENDPOINT:
+        required: true
 jobs:
   deploy:
     name: Deploy to R2
@@ -35,8 +33,8 @@ jobs:
           }
       - name: Upload Files
         run: |
-          aws s3 sync artifacts s3://oxide-downloads/artifacts/${{ github.event.repository.name }}/${{ github.ref_name }} --endpoint-url ${{ inputs.endpoint }}
+          aws s3 sync artifacts s3://oxide-downloads/artifacts/${{ github.event.repository.name }}/${{ github.ref_name }} --endpoint-url ${{ secrets.CLOUDFLARE_R2_ENDPOINT }}
         env:
-          AWS_ACCESS_KEY_ID: ${{ inputs.key }}
-          AWS_SECRET_ACCESS_KEY: ${{ inputs.secret }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET }}
           AWS_DEFAULT_REGION: auto
