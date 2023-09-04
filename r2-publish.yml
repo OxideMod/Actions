@@ -1,0 +1,42 @@
+name: Publish to Cloudflare R2
+on:
+  workflow_call:
+    inputs:
+      key:
+        required: true
+        type: string
+      secret:
+        required: true
+        type: string
+      endpoint:
+        required: true
+        type: string
+      generate-filehash:
+        required: false
+        type: boolean
+jobs:
+  deploy:
+    name: Deploy to R2
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifacts@v3
+        with:
+          name: ${{ github.event.repository.name }}
+          path: artifacts
+      - name: Generate MD5 Files
+        if: inputs.generate-filehash
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path 'artifacts' | ForEach-Object { 
+              $md5 = (Get-FileHash $_.FullName -Algorithm MD5).Hash.ToLower()
+              $data = [System.Text.Encoding]::UTF8.GetBytes($md5)
+              [System.IO.File]::WriteAllBytes("$( $_.FullName ).md5", $data)
+          }
+      - name: Upload Files
+        run: |
+          aws s3 sync artifacts s3://oxide-downloads/artifacts/${{ github.event.repository.name }}/${{ github.ref_name }} --endpoint-url ${{ inputs.endpoint }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ inputs.key }}
+          AWS_SECRET_ACCESS_KEY: ${{ inputs.secret }}
+          AWS_DEFAULT_REGION: auto
