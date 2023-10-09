@@ -1,0 +1,48 @@
+name: Build Solution
+
+on:
+  workflow_call:
+    inputs:
+      branch-postfix:
+        required: false
+        type: string
+      game:
+        required: true
+        type: string
+    secrets:
+        REPO_ACCESS_TOKEN:
+            required: true
+      
+jobs:
+  build:
+    name: Build Oxide Solution
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Increment Version
+        uses: action-pack/increment@v2
+        with:
+          name: "VERSION"
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1
+
+      - name: Build Solution
+        run: msbuild Oxide.${{ inputs.game }}.sln -t:rebuild -restore -property:Configuration=Release -property:Version=2.0.${{ vars.VERSION }}${{ inputs.branch-postfix }}
+
+      - name: Compress Bundles
+        run: |
+          foreach ($directory in Get-ChildItem -Path src\bin\Bundle -Directory)
+          {
+            7z a "$($directory.FullName).zip" "$($directory.FullName)/*"
+          }
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.event.repository.name }}
+          path: src\bin\Bundle\Oxide.*.zip
