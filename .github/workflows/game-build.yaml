@@ -46,3 +46,9 @@ jobs:
         with:
           name: ${{ github.event.repository.name }}
           path: src\bin\Bundle\Oxide.*.zip
+
+      - name: Upload Docs
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.event.repository.name }}-docs
+          path: docs\docs.json
