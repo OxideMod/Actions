@@ -39,13 +39,16 @@ jobs:
           foreach ($directory in Get-ChildItem -Path src\bin\Bundle -Directory)
           {
             7z a "$($directory.FullName).zip" "$($directory.FullName)/*"
+            tar zcf "$($directory.FullName).tar.gz" "$($directory.FullName)/*"
           }
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.event.repository.name }}
-          path: src\bin\Bundle\Oxide.*.zip
+          path: |
+            src\bin\Bundle\Oxide.*.zip
+            src\bin\Bundle\Oxide.*.tar.gz
 
       - name: Upload Docs
         uses: actions/upload-artifact@v4
