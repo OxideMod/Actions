@@ -31,6 +31,16 @@ jobs:
               $data = [System.Text.Encoding]::UTF8.GetBytes($md5)
               [System.IO.File]::WriteAllBytes("$( $_.FullName ).md5", $data)
           }
+      - name: Uninstall Existing AWS CLI
+        run: sudo apt-get remove -y awscli
+      - name: Install AWS CLI v2.22.35
+        run: |
+          curl -sL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.22.35.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install --update
+          rm -rf awscliv2.zip aws
+      - name: Verify AWS CLI Version
+        run: aws --version
       - name: Upload Files
         run: |
           aws s3 sync artifacts s3://oxide-downloads/artifacts/${{ github.event.repository.name }}/${{ github.ref_name }} --endpoint-url ${{ secrets.CLOUDFLARE_R2_ENDPOINT }}
