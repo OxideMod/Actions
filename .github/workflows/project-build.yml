@@ -1,0 +1,82 @@
+name: Build and Deploy
+
+on:
+  workflow_call:
+    inputs:
+      branch-postfix:
+        required: false
+        type: string
+      project-name:
+        required: true
+        type: string
+      version-prefix:
+        required: true
+        type: string
+    outputs:
+      version:
+        description: "The full version number used in the build"
+        value: ${{ jobs.build.outputs.version }}
+    secrets:
+      REPO_ACCESS_TOKEN:
+        required: true
+      DISCORD_WEBHOOK:
+        required: true
+      NUGET_API_KEY:
+        required: true
+
+env:
+  BUILD: ${{ github.ref_name == 'master' && 'Release' || 'Debug' }}
+
+jobs:
+  build:
+    name: Build and Deploy
+    runs-on: windows-2022
+
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build Solution
+        id: build
+        uses: OxideMod/Actions/.github/actions/build-solution@main
+        with:
+          project-name: ${{ inputs.project-name }}
+          branch-postfix: ${{ inputs.branch-postfix }}
+          repo-token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          version-prefix: ${{ inputs.version-prefix }}
+          build-configuration: ${{ env.BUILD }}
+        env:
+          BUILD: ${{ env.BUILD }}
+
+      - name: Upload Artifacts
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}
+          path: src/bin/${{ env.BUILD }}/
+
+      - name: Push NuGet
+        if: github.event_name != 'pull_request'
+        uses: OxideMod/Actions/.github/actions/nuget-upload@main
+        with:
+          nuget-url: ${{ vars.NUGET_SOURCE_URL }}
+          nuget-api-key: ${{ secrets.NUGET_API_KEY }}
+
+  notification:
+    name: Notify Discord
+    runs-on: ubuntu-latest
+    needs: build
+    if: always()
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Discord Notification
+        uses: OxideMod/Actions/.github/actions/discord-notify@main
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+          version: ${{ needs.build.outputs.version }}
+          status: ${{ needs.build.result }}

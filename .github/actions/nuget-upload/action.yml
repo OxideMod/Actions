@@ -1,0 +1,22 @@
+name: "Find and Upload NuGet Packages"
+description: "Find and Upload NuGet Packages"
+
+inputs:
+  nuget-url:
+    description: "URL to push to"
+    required: true
+
+  nuget-api-key:
+    description: "API key to push packages with"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Find and Push NuGet Packages
+      shell: pwsh
+      run: |
+        Get-ChildItem "src\bin\${{env.BUILD}}" -Recurse *.nupkg | ForEach-Object {
+          echo "Found NuGet package: $($_.FullName)"
+          dotnet nuget push $_.FullName --source "${{ inputs.nuget-url }}" --api-key "${{ inputs.nuget-api-key }}"
+        }
