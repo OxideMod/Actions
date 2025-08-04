@@ -5,12 +5,19 @@ on:
       generate-filehash:
         required: false
         type: boolean
+      CLOUDFLARE_R2_PUBLIC_URL_BASE:
+        required: true
+        type: string
     secrets:
       CLOUDFLARE_R2_KEY:
         required: true
       CLOUDFLARE_R2_SECRET:
         required: true
       CLOUDFLARE_R2_ENDPOINT:
+        required: true
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_ZONE_ID:
         required: true
 jobs:
   deploy:
@@ -26,7 +33,7 @@ jobs:
         if: inputs.generate-filehash
         shell: pwsh
         run: |
-          Get-ChildItem -Path 'artifacts' | ForEach-Object { 
+          Get-ChildItem -Path 'artifacts' | ForEach-Object {
               $md5 = (Get-FileHash $_.FullName -Algorithm MD5).Hash.ToLower()
               $data = [System.Text.Encoding]::UTF8.GetBytes($md5)
               [System.IO.File]::WriteAllBytes("$( $_.FullName ).md5", $data)
@@ -48,3 +55,18 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET }}
           AWS_DEFAULT_REGION: auto
+      - name: Purge Cloudflare Cache for Uploaded Files
+        shell: pwsh
+        run: |
+          $baseUrl = "${{ inputs.CLOUDFLARE_R2_PUBLIC_URL_BASE }}"
+          $prefix = "artifacts/${{ github.event.repository.name }}/${{ github.ref_name }}"
+          $files = Get-ChildItem -Recurse -File artifacts | ForEach-Object { "$baseUrl/$prefix/$( $_.FullName.Substring((Resolve-Path artifacts).Path.Length + 1).Replace('\\','/') )" }
+          $json = @{ files = $files } | ConvertTo-Json -Compress
+          curl -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" `
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" `
+            -H "Content-Type: application/json" `
+            --data "$json"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_R2_PUBLIC_URL_BASE: ${{ inputs.CLOUDFLARE_R2_PUBLIC_URL_BASE }}
