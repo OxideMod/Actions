@@ -42,12 +42,12 @@ jobs:
           repo-token: ${{ secrets.REPO_ACCESS_TOKEN }}
           version-prefix: '2.0'
 
-      - name: Push NuGet
-        if: github.event_name != 'pull_request'
-        uses: OxideMod/Actions/.github/actions/nuget-upload@main
-        with:
-          nuget-url: ${{ vars.NUGET_SOURCE_URL }}
-          nuget-api-key: ${{ secrets.NUGET_API_KEY }}
+      # - name: Push NuGet
+      #   if: github.event_name != 'pull_request'
+      #   uses: OxideMod/Actions/.github/actions/nuget-upload@main
+      #   with:
+      #     nuget-url: ${{ vars.NUGET_SOURCE_URL }}
+      #     nuget-api-key: ${{ secrets.NUGET_API_KEY }}
 
       - name: Compress Bundles
         run: |
