@@ -14,6 +14,10 @@ inputs:
     description: "Configuration to build the solution in"
     required: false
     default: "Release"
+  dotnet-version:
+    description: "Version of the .NET SDK used to run the build"
+    required: false
+    default: "8.0.x"
   project-name:
     description: "Name of the project/solution to build"
     required: true
@@ -36,9 +40,11 @@ runs:
         name: "VERSION"
         token: ${{ inputs.repo-token }}
 
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v2
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
 
     - name: Build Solution
       shell: pwsh
-      run: msbuild ${{ inputs.project-name }}.sln -t:rebuild -restore -property:Configuration=${{ inputs.build-configuration }} -property:Version=${{inputs.version-prefix}}.${{ steps.version-increment.outputs.value }}${{ inputs.branch-postfix }}
+      run: dotnet msbuild ${{ inputs.project-name }}.sln -t:rebuild -restore -property:Configuration=${{ inputs.build-configuration }} -property:Version=${{inputs.version-prefix}}.${{ steps.version-increment.outputs.value }}${{ inputs.branch-postfix }}
